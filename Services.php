@@ -585,20 +585,6 @@ class Services {
 		) , $func_array_select2);
 		$billic->set_title('Admin/Services');
 		echo '<h1><i class="icon-tasks"></i> Services</h1>';
-		if (array_key_exists('Ls', $billic->lic)) {
-			$lic_count = $db->q('SELECT COUNT(*) FROM `services` WHERE `domainstatus` = ?', 'Active');
-			$lic_count = $lic_count[0]['COUNT(*)'];
-			$lic_percent = ceil((100 / $billic->lic['Ls']) * $lic_count);
-			echo '<div class="alert alert-';
-			if ($lic_percent >= 80) {
-				echo 'danger';
-			} else if ($lic_percent >= 60) {
-				echo 'warning';
-			} else {
-				echo 'info';
-			}
-			echo '" role="alert">Your Billic license limits you to ' . $billic->lic['Ls'] . ' active services. You are currently using ' . $lic_count . ' at ' . $lic_percent . '% capacity.</div>';
-		}
 		$billic->show_errors();
 		echo $billic->modules['ListManager']->search_box();
 		echo '<div style="float: right;padding-right: 40px;">Showing ' . $pagination['start_text'] . ' to ' . $pagination['end_text'] . ' of ' . $total . ' Services</div>' . $billic->modules['ListManager']->search_link();
