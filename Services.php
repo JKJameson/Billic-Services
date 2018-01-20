@@ -515,9 +515,6 @@ class Services {
 			}
 			return;
 		}
-		if (isset($_GET['POST'])) {
-			$_POST = json_decode(base64_decode($_GET['POST']) , true);
-		}
 		$billic->module('ListManager');
 		$billic->modules['ListManager']->configure(array(
 			'search' => array(
@@ -579,7 +576,6 @@ class Services {
 		$total = $total[0]['COUNT(*)'];
 		$pagination = $billic->pagination(array(
 			'total' => $total,
-			'list_manager' => $billic->module['ListManager'],
 		));
 		echo $pagination['menu'];
 		$func_array_select2[0] = 'SELECT * FROM ' . $func_array_select2[0] . ' ORDER BY `regdate` DESC LIMIT ' . $pagination['start'] . ',' . $pagination['limit'];
