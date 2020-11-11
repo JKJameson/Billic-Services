@@ -802,10 +802,10 @@ class Services {
 				echo '<td>';
 				$links = array();
 				if (in_array($service['module'], $modules_with_cp)) {
-					$links[] = '<a href="/User/Services/ID/' . $service['id'] . '/" class="btn btn-xs btn-default"><i class="icon-gears-setting"></i> Control Panel</a>';
+					$links[] = '<a href="/User/Services/ID/' . $service['id'] . '/" class="btn btn-primary"><i class="icon-gears-setting"></i> Control Panel</a><br><br>';
 				}
-				$links[] = '<a href="/User/Tickets/Service/' . $service['id'] . '/New/" class="btn btn-xs btn-default"><i class="icon-ticket"></i> Open Ticket</a>';
-				$links[] = '<a href="/User/Invoices/Service/' . $service['id'] . '/" class="btn btn-xs btn-default"><i class="icon-tags"></i> Invoices</a>';
+				$links[] = '<a href="/User/Tickets/Service/' . $service['id'] . '/New/" class="btn btn-sm btn-default"><i class="icon-ticket"></i> Open Ticket</a><br><br>';
+				$links[] = '<a href="/User/Invoices/Service/' . $service['id'] . '/" class="btn btn-sm btn-default"><i class="icon-tags"></i> View Invoices</a>';
 				echo implode(' ', $links);
 				echo '</td></tr>';
 			}
@@ -944,7 +944,7 @@ class Services {
 		/*
 			Generate Renewal Invoices
 		*/
-		$services = $db->q('SELECT * FROM `services` WHERE (`domainstatus` = \'Active\' OR `domainstatus` = \'Suspended\') AND `invoicegenerated` = \'0\' AND `nextduedate` < \'' . (time() + 604800) . '\' AND `error` = \'\''); // 1 week
+		$services = $db->q('SELECT * FROM `services` WHERE (`domainstatus` = \'Active\' OR `domainstatus` = \'Suspended\') AND `invoicegenerated` = \'0\' AND `nextduedate` < \'' . (time() + 604800) . '\''); // 1 week
 		$billic->module('BillingCycles');
 		if (count($services) > 0) {
 			$billingcycles = $billic->modules['BillingCycles']->list_billing_cycles();
@@ -1112,10 +1112,10 @@ class Services {
 			$orderform = $orderform[0];
 		}
 		if (empty($plan)) {
-			return 'Invalid Billic Plan';
+			return 'Invalid billic Plan';
 		}
 		if (empty($orderform)) {
-			return 'Invalid Billic Order Form';
+			return 'Invalid billic Order Form';
 		}
 		$user_row = $db->q('SELECT * FROM `users` WHERE `id` = ?', $service['userid']);
 		$user_row = $user_row[0];
