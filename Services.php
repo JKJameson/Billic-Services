@@ -135,7 +135,8 @@ class Services {
 					if (!empty($service['error'])) {
 						if (isset($_POST['clear_error'])) {
 							if ($service['donotsuspenduntil']<time()) {
-								$db->q('UPDATE `services` SET `donotsuspenduntil` = ? WHERE `id` = ?', (time() + (86400*7)) , $service['id']);
+								$service['donotsuspenduntil'] = (time() + (86400*7));
+								$db->q('UPDATE `services` SET `donotsuspenduntil` = ? WHERE `id` = ?', $service['donotsuspenduntil'] , $service['id']);
 								echo '<div class="alert alert-warning" role="alert">To prevent accidental suspension and termination, the "Override suspension/termination" time has been set to 7 days from now.</div>';
 							}
 							$db->q('UPDATE `services` SET `error` = \'\', `errorfunc` = \'\' WHERE `id` = ?', $service['id']);
