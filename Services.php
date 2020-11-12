@@ -31,7 +31,7 @@ class Services {
 			$user_row = $user_row[0];
 			$billic->module($service['module']);
 			$billic->set_title('Service ' . $service['username'] . (empty($service['username']) ? 'ID ' . $service['id'] : ''));
-			echo '<img src="' . $billic->avatar($user_row['email'], 100) . '" class="pull-left" style="margin: 5px 5px 5px 0"><h3><a href="/Admin/Users/ID/' . $user_row['id'] . '/">' . $user_row['firstname'] . ' ' . $user_row['lastname'] . '' . (empty($user_row['companyname']) ? '' : ' - ' . $user_row['companyname']) . '</a> &raquo; ' . $billic->service_type($service) . '</h3><div class="btn-group" role="group" aria-label="Service Actions">';
+			echo '<img src="' . $billic->avatar($user_row['email'], 100) . '" class="pull-left float-left" style="margin: 5px 5px 5px 0"><h3><a href="/Admin/Users/ID/' . $user_row['id'] . '/">' . $user_row['firstname'] . ' ' . $user_row['lastname'] . '' . (empty($user_row['companyname']) ? '' : ' - ' . $user_row['companyname']) . '</a> &raquo; ' . $billic->service_type($service) . '</h3><div class="btn-group" role="group" aria-label="Service Actions">';
 			if ($billic->user_has_permission($billic->user, 'Services_ControlPanel')) {
 				echo '<a href="/Admin/Services/ID/' . $service['id'] . '/" class="btn btn-info"><i class="icon-gears-setting"></i> Control Panel</a>';
 			}
@@ -59,7 +59,7 @@ class Services {
 			if ($billic->user_has_permission($billic->user, 'Services_Move_Service')) {
 				echo '<a href="/Admin/Services/ID/' . $service['id'] . '/Do/MoveService/" class="btn btn-default"><i class="icon-exchange"></i> Move Service</a>';
 			}
-			echo '</div><div style="clear:both"></div>';
+			echo '</div><div style="clear:both"></div><br>';
 			if ($billic->user_has_permission($billic->user, 'Services_Generate_Invoice')) {
 				if ($_GET['Do'] == 'GenerateInvoice') {
 					$invoiceid = $db->q('SELECT `invoiceid` FROM `invoiceitems` WHERE `relid` = ? ORDER BY `id` DESC LIMIT 1', $service['id']);
