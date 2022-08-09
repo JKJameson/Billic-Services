@@ -121,7 +121,11 @@ class Services {
 							$coupon_data['remaining_billing_cycles'] = 0;
 						}
 						if (empty($billic->errors)) {
-							$db->q('UPDATE `services` SET `username` = ?, `domain` = ?, `domainstatus` = ?, `suspension_reason` = ?, `nextduedate` = ?, `donotsuspenduntil` = ?, `amount` = ?, `billingcycle` = ?, `import_data` = ?, `module` = ?, `coupon_data` = ? WHERE `id` = ?', $_POST['username'], $_POST['domain'], $_POST['status'], $_POST['suspension_reason'], $nextduedate, $donotsuspenduntil, $_POST['amount'], $_POST['billingcycle'], $import_data, $_POST['module'], json_encode($coupon_data) , $service['id']);
+							$suspendeddate = $service['suspendeddate'];
+							if ($service['domainstatus']!=$_POST['status']) {
+								if ($_POST['status']=='Suspended') $suspendeddate = time(); else $suspendeddate = 0;	
+							}
+							$db->q('UPDATE `services` SET `username` = ?, `domain` = ?, `domainstatus` = ?, `suspension_reason` = ?, `nextduedate` = ?, `suspendeddate` = ?, `donotsuspenduntil` = ?, `amount` = ?, `billingcycle` = ?, `import_data` = ?, `module` = ?, `coupon_data` = ? WHERE `id` = ?', $_POST['username'], $_POST['domain'], $_POST['status'], $_POST['suspension_reason'], $nextduedate, $suspendeddate, $donotsuspenduntil, $_POST['amount'], $_POST['billingcycle'], $import_data, $_POST['module'], json_encode($coupon_data) , $service['id']);
 							if (is_array($_POST['serviceoption_value'])) {
 								foreach ($_POST['serviceoption_value'] as $k => $v) {
 									$db->q('UPDATE `serviceoptions` SET `value` = ? WHERE `id` = ?', $v, $k);
@@ -197,6 +201,9 @@ class Services {
 					}
 					echo '</select></td></tr>';
 					echo '<tr><td>Suspension Reason:</td><td><input type="text" class="form-control" name="suspension_reason" value="' . safe($service['suspension_reason']) . '"></td></tr>';
+					if ($service['suspendeddate']>0) {
+						echo '<tr><td>Suspension Date:</td><td>' . safe(date('Y-m-d H:i', $service['suspendeddate'])) . '</td></tr>';	
+					}
 					echo '<tr><td>Recurring Amount:</td><td><div class="input-group" style="width: 200px"><span class="input-group-addon">' . get_config('billic_currency_prefix') . '</span><input type="text" class="form-control" name="amount" value="' . safe($service['amount']) . '"><span class="input-group-addon">' . get_config('billic_currency_suffix') . '</span></div></td></tr>';
 					echo '<tr><td>Setup Amount:</td><td><div class="input-group" style="width: 200px"><span class="input-group-addon">' . get_config('billic_currency_prefix') . '</span><input type="text" class="form-control" name="amount" value="' . safe($service['setup']) . '"  disabled="disabled"><span class="input-group-addon">' . get_config('billic_currency_suffix') . '</span></div></td></tr>';
 					if (!empty($service['import_data'])) {
@@ -422,7 +429,7 @@ class Services {
 					if ($do !== true) {
 						err('Suspend Error: ' . $do);
 					} else {
-						$db->q('UPDATE `services` SET `domainstatus` = ? WHERE `id` = ?', 'Suspended', $service['id']);
+						$db->q('UPDATE `services` SET `domainstatus` = ?, `suspenddate` = ? WHERE `id` = ?', 'Suspended', time(), $service['id']);
 						echo '<div class="alert alert-success" role="alert">Service successfully suspended.</div>';
 					}
 					exit;
@@ -446,7 +453,7 @@ class Services {
 					if ($do !== true) {
 						err('Unsuspend Error: ' . $do);
 					} else {
-						$db->q('UPDATE `services` SET `domainstatus` = ? WHERE `id` = ?', 'Active', $service['id']);
+						$db->q('UPDATE `services` SET `domainstatus` = ?, `suspendeddate` = 0 WHERE `id` = ?', 'Active', $service['id']);
 						$extratext = '';
 						if ($service['donotsuspenduntil'] < time()) {
 							$db->q('UPDATE `services` SET `donotsuspenduntil` = ? WHERE `id` = ?', (time() + 86400) , $service['id']);
@@ -1034,7 +1041,7 @@ class Services {
 			if ($suspend !== true) {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'suspend', 'Module Error: ' . $suspend, $service['id']);
 			} else {
-				$db->q('UPDATE `services` SET `domainstatus` = \'Suspended\' WHERE `id` = ?', $service['id']);
+				$db->q('UPDATE `services` SET `domainstatus` = \'Suspended\', `suspendeddate` = ? WHERE `id` = ?', time(), $service['id']);
 				$template_id = $db->q('SELECT `email_template_suspended` FROM `plans` WHERE `id` = ?', $service['packageid']);
 				$template_id = $template_id[0]['email_template_suspended'];
 				if (!is_int($template_id)) {
@@ -1053,7 +1060,8 @@ class Services {
 			}
 		}
 		// terminate suspended accounts 2 weeks after nextduedate
-		$services = $db->q('SELECT * FROM `services` WHERE `domainstatus` = ? AND `nextduedate` < ? AND `error` = \'\' AND `donotsuspenduntil` < \'' . time() . '\'', 'Suspended', (time() - 1209600));
+		$search_time = (time() - 1209600);
+		$services = $db->q('SELECT * FROM `services` WHERE `domainstatus` = ? AND `nextduedate` < ? AND `suspendeddate` < ? AND `error` = \'\' AND `donotsuspenduntil` < \'' . time() . '\'', 'Suspended', $search_time, $search_time);
 		foreach ($services as $service) {
 			$user_row = $db->q('SELECT * FROM `users` WHERE `id` = ?', $service['userid']);
 			$user_row = $user_row[0];
