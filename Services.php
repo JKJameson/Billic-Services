@@ -429,7 +429,7 @@ class Services {
 					if ($do !== true) {
 						err('Suspend Error: ' . $do);
 					} else {
-						$db->q('UPDATE `services` SET `domainstatus` = ?, `suspenddate` = ? WHERE `id` = ?', 'Suspended', time(), $service['id']);
+						$db->q('UPDATE `services` SET `domainstatus` = ?, `suspendeddate` = ? WHERE `id` = ?', 'Suspended', time(), $service['id']);
 						echo '<div class="alert alert-success" role="alert">Service successfully suspended.</div>';
 					}
 					exit;
