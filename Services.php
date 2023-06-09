@@ -359,7 +359,7 @@ class Services {
 					}
 					echo '<tr><td width="130">Current Plan:</td><td>' . safe($current_plan_name) . '</td></tr>';
 					echo '<tr><td' . $billic->highlight('newplan') . '>New Plan:</td><td><select class="form-control" name="newplan">';
-					$plans = $db->q('SELECT * FROM `plans`', $service['packageid']);
+					$plans = $db->q('SELECT * FROM `plans`');
 					foreach ($plans as $plan) {
 						echo '<option value="' . $plan['id'] . '"' . ($plan['id'] == $service['packageid'] ? ' selected' : '') . '>' . $plan['name'] . '</option>';
 					}
