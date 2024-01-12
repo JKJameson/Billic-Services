@@ -1059,7 +1059,7 @@ class Services {
 				));
 			}
 		}
-		// terminate suspended accounts 2 weeks after nextduedate
+		// terminate suspended accounts 2 weeks after nextduedate & suspendeddate
 		$search_time = (time() - 1209600);
 		$services = $db->q('SELECT * FROM `services` WHERE `domainstatus` = ? AND `nextduedate` < ? AND `suspendeddate` < ? AND `error` = \'\' AND `donotsuspenduntil` < \'' . time() . '\'', 'Suspended', $search_time, $search_time);
 		foreach ($services as $service) {
