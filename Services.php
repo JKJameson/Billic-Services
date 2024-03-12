@@ -29,7 +29,6 @@ class Services {
 			}
 			$user_row = $db->q('SELECT * FROM `users` WHERE `id` = ?', $service['userid']);
 			$user_row = $user_row[0];
-			$billic->module($service['module']);
 			$billic->set_title('Service ' . $service['username'] . (empty($service['username']) ? 'ID ' . $service['id'] : ''));
 			echo '<img src="' . $billic->avatar($user_row['email'], 100) . '" class="pull-left float-left" style="margin: 5px 5px 5px 0"><h3><a href="/Admin/Users/ID/' . $user_row['id'] . '/">' . $user_row['firstname'] . ' ' . $user_row['lastname'] . '' . (empty($user_row['companyname']) ? '' : ' - ' . $user_row['companyname']) . '</a> &raquo; ' . $billic->service_type($service) . '</h3><div class="btn-group" role="group" aria-label="Service Actions">';
 			if ($billic->user_has_permission($billic->user, 'Services_ControlPanel')) {
@@ -41,16 +40,16 @@ class Services {
 			if ($billic->user_has_permission($billic->user, 'Services_Change_Plan')) {
 				echo '<a href="/Admin/Services/ID/' . $service['id'] . '/Do/ChangePlan/" class="btn btn-default"><i class="icon-archive"></i> Change Plan</a>';
 			}
-			if (($service['domainstatus'] == 'Pending' || $service['domainstatus'] == 'Terminated' || $service['domainstatus'] == 'Cancelled') && $billic->user_has_permission($billic->user, 'Services_Create') && method_exists($billic->modules[$service['module']], 'create')) {
+			if (($service['domainstatus'] == 'Pending' || $service['domainstatus'] == 'Terminated' || $service['domainstatus'] == 'Cancelled') && $billic->user_has_permission($billic->user, 'Services_Create') && $billic->module_has_function($service['module'], 'create')) {
 				echo '<a href="/Admin/Services/ID/' . $service['id'] . '/Do/Create/" class="btn btn-success" onclick="return confirm(\'Are you sure: CREATE?\');"><i class="icon-plus"></i> Create</a>';
 			}
-			if ($service['domainstatus'] == 'Active' && $billic->user_has_permission($billic->user, 'Services_Suspend') && method_exists($billic->modules[$service['module']], 'suspend')) {
+			if ($service['domainstatus'] == 'Active' && $billic->user_has_permission($billic->user, 'Services_Suspend') && $billic->module_has_function($service['module'], 'suspend')) {
 				echo '<a href="/Admin/Services/ID/' . $service['id'] . '/Do/Suspend/" class="btn btn-warning" onclick="return confirm(\'Are you sure: SUSPEND?\');"><i class="icon-pause"></i> Suspend</a>';
 			}
-			if ($service['domainstatus'] == 'Suspended' && $billic->user_has_permission($billic->user, 'Services_Unsuspend') && method_exists($billic->modules[$service['module']], 'unsuspend')) {
+			if ($service['domainstatus'] == 'Suspended' && $billic->user_has_permission($billic->user, 'Services_Unsuspend') && $billic->module_has_function($service['module'], 'unsuspend')) {
 				echo '<a href="/Admin/Services/ID/' . $service['id'] . '/Do/Unsuspend/" class="btn btn-success" onclick="return confirm(\'Are you sure: UNSUSPEND?\');"><i class="icon-play"></i> Unsuspend</a>';
 			}
-			if (($service['domainstatus'] == 'Active' || $service['domainstatus'] == 'Suspended') && $billic->user_has_permission($billic->user, 'Services_Terminate') && method_exists($billic->modules[$service['module']], 'terminate')) {
+			if (($service['domainstatus'] == 'Active' || $service['domainstatus'] == 'Suspended') && $billic->user_has_permission($billic->user, 'Services_Terminate') && $billic->module_has_function($service['module'], 'terminate')) {
 				echo '<a href="/Admin/Services/ID/' . $service['id'] . '/Do/Terminate/" class="btn btn-danger" onclick="return confirm(\'Are you sure: TERMINATE?\');"><i class="icon-remove"></i> Terminate</a>';
 			}
 			if ($billic->user_has_permission($billic->user, 'Services_Generate_Invoice')) {
@@ -61,24 +60,23 @@ class Services {
 			}
 			echo '</div><div style="clear:both"></div><br>';
 			if ($billic->user_has_permission($billic->user, 'Services_Generate_Invoice')) {
-				if ($_GET['Do'] == 'GenerateInvoice') {
+				if (isset($_GET['Do']) && $_GET['Do'] == 'GenerateInvoice') {
 					$invoiceid = $db->q('SELECT `invoiceid` FROM `invoiceitems` WHERE `relid` = ? ORDER BY `id` DESC LIMIT 1', $service['id']);
 					$invoiceid = $invoiceid[0]['invoiceid'];
 					$invoicecount = $db->q('SELECT COUNT(*) FROM `invoices` WHERE `id` = ? AND `status` = ?', $invoiceid, 'Unpaid');
 					if ($invoicecount[0]['COUNT(*)'] > 0) {
 						err('Unable to generate an invoice because <a href="/Admin/Invoices/ID/' . $invoiceid . '/">Invoice #' . $invoiceid . '</a> has already been generated.');
 					}
-					$billic->module('Invoices');
-					$invoiceid = $billic->modules['Invoices']->generate(array(
+					$invoiceid = $billic->module('Invoices', 'generate', [
 						'service' => $service,
 						'user' => $user_row,
 						'duedate' => $service['nextduedate'],
-					));
+					]);
 					$billic->redirect('/Admin/Invoices/ID/' . $invoiceid . '/');
 				}
 			}
 			if ($billic->user_has_permission($billic->user, 'Services_Edit')) {
-				if ($_GET['Do'] == 'Edit') {
+				if (isset($_GET['Do']) && $_GET['Do'] == 'Edit') {
 					if (empty($service['coupon_name'])) {
 						$coupon_data = array();
 					} else {
@@ -222,13 +220,15 @@ class Services {
 					}
 					echo '</select></td></tr>';
 					echo '<tr><td>Billing Cycle:</td><td><select class="form-control" name="billingcycle" style="font-family: monospace">';
+					function nbsp_fill($str, $len) {
+						$times = ($len - strlen($str));
+						if ($times<1) return $str;
+						return $str.str_repeat('&nbsp;', $times);
+					}
 					foreach ($billingcycles as $billingcycle) {
-						$string1 = $billingcycle['name'];
-						$string1.= str_repeat('&nbsp;', (31 - strlen($string1)));
-						$string2 = round($billingcycle['multiplier'], 2) . 'x Price';
-						$string2.= str_repeat('&nbsp;', (15 - strlen($string2)));
-						$string3 = $billic->time_ago(time() - $billingcycle['seconds']);
-						$string3.= str_repeat('&nbsp;', (15 - strlen($string3)));
+						$string1 = nbsp_fill($billingcycle['name'], 31);
+						$string2 = nbsp_fill(round($billingcycle['multiplier'], 2) . 'x Price', 15);
+						$string3 = nbsp_fill($billic->time_ago(time() - $billingcycle['seconds']), 15);
 						echo '<option value="' . $billingcycle['name'] . '"' . ($billingcycle['name'] == $service['billingcycle'] ? ' selected' : '') . '>' . $string1 . ' ' . $string2 . ' ' . $string3 . ' ' . $billingcycle['discount'] . '% Discount</option>';
 					}
 					echo '</select></td></tr>';
@@ -269,7 +269,7 @@ class Services {
 				}
 			}
 			if ($billic->user_has_permission($billic->user, 'Services_Change_Plan')) {
-				if ($_GET['Do'] == 'ChangePlan') {
+				if (isset($_GET['Do']) && $_GET['Do'] == 'ChangePlan') {
 					if (isset($_POST['changeplan'])) {
 						$plan = $db->q('SELECT * FROM `plans` WHERE `id` = ?', $_POST['newplan']);
 						$plan = $plan[0];
@@ -370,7 +370,7 @@ class Services {
 				}
 			}
 			if ($billic->user_has_permission($billic->user, 'Services_Move_Service')) {
-				if ($_GET['Do'] == 'MoveService') {
+				if (isset($_GET['Do']) && $_GET['Do'] == 'MoveService') {
 					if (isset($_POST['moveservice'])) {
 						$user = $db->q('SELECT * FROM `users` WHERE `id` = ?', $_POST['userid']);
 						$user = $user[0];
@@ -393,7 +393,7 @@ class Services {
 				}
 			}
 			if ($billic->user_has_permission($billic->user, 'Services_Create')) {
-				if ($_GET['Do'] == 'Create') {
+				if (isset($_GET['Do']) && $_GET['Do'] == 'Create') {
 					if ($service['domainstatus'] != 'Pending' && $service['domainstatus'] != 'Terminated') {
 						err('You can only create a service if the status is Pending or Terminated');
 					}
@@ -412,7 +412,7 @@ class Services {
 				}
 			}
 			if ($billic->user_has_permission($billic->user, 'Services_Suspend')) {
-				if ($_GET['Do'] == 'Suspend') {
+				if (isset($_GET['Do']) && $_GET['Do'] == 'Suspend') {
 					$vars = array();
 					$tmp = $db->q('SELECT * FROM `serviceoptions` WHERE `serviceid` = ?', $service['id']);
 					foreach ($tmp as $v) {
@@ -422,10 +422,7 @@ class Services {
 						'service' => $service,
 						'vars' => $vars,
 					);
-					$do = call_user_func(array(
-						$billic->modules[$service['module']],
-						'suspend'
-					) , $array);
+					$do = $billic->module($service['module'], 'suspend', $array);
 					if ($do !== true) {
 						err('Suspend Error: ' . $do);
 					} else {
@@ -436,7 +433,7 @@ class Services {
 				}
 			}
 			if ($billic->user_has_permission($billic->user, 'Services_Unsuspend')) {
-				if ($_GET['Do'] == 'Unsuspend') {
+				if (isset($_GET['Do']) && $_GET['Do'] == 'Unsuspend') {
 					$vars = array();
 					$tmp = $db->q('SELECT * FROM `serviceoptions` WHERE `serviceid` = ?', $service['id']);
 					foreach ($tmp as $v) {
@@ -446,10 +443,7 @@ class Services {
 						'service' => $service,
 						'vars' => $vars,
 					);
-					$do = call_user_func(array(
-						$billic->modules[$service['module']],
-						'unsuspend'
-					) , $array);
+					$do = $billic->module($service['module'], 'unsuspend', $array);
 					if ($do !== true) {
 						err('Unsuspend Error: ' . $do);
 					} else {
@@ -465,7 +459,7 @@ class Services {
 				}
 			}
 			if ($billic->user_has_permission($billic->user, 'Services_Terminate')) {
-				if ($_GET['Do'] == 'Terminate') {
+				if (isset($_GET['Do']) && $_GET['Do'] == 'Terminate') {
 					$vars = array();
 					$tmp = $db->q('SELECT * FROM `serviceoptions` WHERE `serviceid` = ?', $service['id']);
 					foreach ($tmp as $v) {
@@ -475,10 +469,7 @@ class Services {
 						'service' => $service,
 						'vars' => $vars,
 					);
-					$do = call_user_func(array(
-						$billic->modules[$service['module']],
-						'terminate'
-					) , $array);
+					$do = $billic->module($service['module'], 'terminate', $array);
 					if ($do !== true) {
 						err('Termination Error: ' . $do);
 					} else {
@@ -514,37 +505,31 @@ class Services {
 				'service' => $service,
 				'vars' => $vars,
 			);
-			if (method_exists($billic->modules[$service['module']], 'user_cp')) {
-				if (!$billic->user_has_permission($billic->user, 'Services_ControlPanel')) {
-					err('You do not have permission to access the Control Panel');
-				}
-				call_user_func(array(
-					$billic->modules[$service['module']],
-					'user_cp'
-				) , $array);
+			if ($billic->module_has_function($service['module'], 'user_cp')) {
+				if (!$billic->user_has_permission($billic->user, 'Services_ControlPanel')) err('You do not have permission to access the Control Panel');
+				$billic->module($service['module'], 'user_cp', $array);
 			} else {
 				echo '<p>The module ' . $service['module'] . ' does not have a control panel. No controls will be shown to the user.</p>';
 			}
 			return;
 		}
-		$billic->module('ListManager');
-		$billic->modules['ListManager']->configure(array(
-			'search' => array(
+		$billic->module('ListManager', 'configure', [
+			'search' => [
 				'id' => 'text',
 				'username' => 'text',
 				'desc' => 'text',
 				'plan' => 'text',
 				'price' => 'text',
-				'status' => array(
+				'status' => [
 					'(All)',
 					'Active',
 					'Cancelled',
 					'Pending',
 					'Suspended',
 					'Terminated'
-				) ,
-			) ,
-		));
+				],
+			],
+		]);
 		$where = '';
 		$where_values = array();
 		if (isset($_POST['search'])) {
@@ -598,8 +583,8 @@ class Services {
 		$billic->set_title('Admin/Services');
 		echo '<h1><i class="icon-tasks"></i> Services</h1>';
 		$billic->show_errors();
-		echo $billic->modules['ListManager']->search_box();
-		echo '<div style="float: right;padding-right: 40px;">Showing ' . $pagination['start_text'] . ' to ' . $pagination['end_text'] . ' of ' . $total . ' Services</div>' . $billic->modules['ListManager']->search_link();
+		echo $billic->module('ListManager', 'search_box');
+		echo '<div style="float: right;padding-right: 40px;">Showing ' . $pagination['start_text'] . ' to ' . $pagination['end_text'] . ' of ' . $total . ' Services</div>' . $billic->module('ListManager', 'search_link');
 		echo '<table class="table table-striped"><tr><th>Service</th><th>Info</th><th>Plan</th><th>Module</th><th>Price</th><th>Next Due Date</th><th>Status</th></tr>';
 		if (empty($services)) {
 			echo '<tr><td colspan="20">No Services matching filter.</td></tr>';
@@ -610,9 +595,8 @@ class Services {
 				$modules_with_cp[] = $v['id'];
 			}
 			unset($modules_with_cp_tmp);
-			$billic->module('BillingCycles');
 			if (count($services) > 0) {
-				$billingcycles = $billic->modules['BillingCycles']->list_billing_cycles();
+				$billingcycles = $billic->module('BillingCycles', 'list_billing_cycles');
 			}
 		}
 		foreach ($services as $service) {
@@ -651,8 +635,7 @@ class Services {
 				echo '<a href="/Admin/Services/ID/' . $service['id'] . '/" class="btn btn-xs btn-default"><i class="icon-gears-setting"></i> Control Panel</a> ';
 			}
 			echo '<a href="/Admin/Services/ID/' . $service['id'] . '/Do/Edit/" class="btn btn-xs btn-default"><i class="icon-edit-write"></i> Edit</a></td><td>';
-			$billic->module($service['module']);
-			if (method_exists($billic->modules[$service['module']], 'service_info')) {
+			if ($billic->module_has_function($service['module'], 'service_info')) {
 				$vars = array();
 				$tmp = $db->q('SELECT * FROM `serviceoptions` WHERE `serviceid` = ?', $service['id']);
 				foreach ($tmp as $v) {
@@ -662,10 +645,7 @@ class Services {
 					'service' => $service,
 					'vars' => $vars,
 				);
-				$info = call_user_func(array(
-					$billic->modules[$service['module']],
-					'service_info'
-				) , $array);
+				$info = $billic->module($service['module'], 'service_info', $array);
 				echo $info;
 			} else {
 				echo $service['info_cache'];
@@ -717,7 +697,6 @@ class Services {
 					err('This service is awaiting payment. After you pay the invoice your service will be activated.');
 				break;
 			}
-			$billic->module($service['module']);
 			$vars = array();
 			$tmp = $db->q('SELECT * FROM `serviceoptions` WHERE `serviceid` = ?', $service['id']);
 			foreach ($tmp as $v) {
@@ -727,11 +706,8 @@ class Services {
 				'service' => $service,
 				'vars' => $vars,
 			);
-			if (method_exists($billic->modules[$service['module']], 'user_cp')) {
-				call_user_func(array(
-					$billic->modules[$service['module']],
-					'user_cp'
-				) , $array);
+			if ($billic->module_has_function($service['module'], 'user_cp')) {
+				$billic->module($service['module'], 'user_cp', $array);
 			} else {
 				echo '<p>There are no controls available for this service.</p>';
 			}
@@ -746,10 +722,7 @@ class Services {
 		}
 		unset($modules_with_cp_tmp);
 		$services = $db->q('SELECT * FROM `services` WHERE `userid` = ? AND (`domainstatus` = \'Active\' OR `domainstatus` = \'Suspended\' OR `domainstatus` = \'Pending\') ORDER BY `module`, `domain` ASC', $billic->user['id']);
-		$billic->module('BillingCycles');
-		if (count($services) > 0) {
-			$billingcycles = $billic->modules['BillingCycles']->list_billing_cycles();
-		}
+		if (count($services) > 0) $billingcycles = $billic->module('BillingCycles', 'list_billing_cycles');
 		if (empty($services)) {
 			echo '<p>You have no services.</p>';
 		} else {
@@ -774,8 +747,7 @@ class Services {
 					$current_plan_name = $service['plan'];
 				}
 				echo '<tr><td>' . $service['domain'] . '</td><td>' . $service['username'] . '</td><td>';
-				$billic->module($service['module']);
-				if (method_exists($billic->modules[$service['module']], 'service_info')) {
+				if ($billic->module_has_function($service['module'], 'service_info')) {
 					$vars = array();
 					$tmp = $db->q('SELECT * FROM `serviceoptions` WHERE `serviceid` = ?', $service['id']);
 					foreach ($tmp as $v) {
@@ -785,10 +757,7 @@ class Services {
 						'service' => $service,
 						'vars' => $vars,
 					);
-					$info = call_user_func(array(
-						$billic->modules[$service['module']],
-						'service_info'
-					) , $array);
+					$info = $billic->module($service['module'], 'service_info', $array);
 					echo $info;
 				} else {
 					echo $service['info_cache'];
@@ -831,10 +800,7 @@ class Services {
 		if (empty($services)) {
 			echo '<tr><td colspan="20">User has no services</td></tr>';
 		}
-		$billic->module('BillingCycles');
-		if (count($services) > 0) {
-			$billingcycles = $billic->modules['BillingCycles']->list_billing_cycles();
-		}
+		if (count($services) > 0) $billingcycles = $billic->module('BillingCycles', 'list_billing_cycles');
 		foreach ($services as $service) {
 			// billing cycle multiplier
 			$price = round($service['amount'] * $billingcycles[$service['billingcycle']]['multiplier'], 2);
@@ -855,8 +821,7 @@ class Services {
 				$current_plan_name = $service['plan'];
 			}
 			echo '<tr><td>' . $service['id'] . '</td><td>' . safe($service['domain']) . '</td><td>' . safe($service['username']) . '</td><td>';
-			$billic->module($service['module']);
-			if (method_exists($billic->modules[$service['module']], 'service_info')) {
+			if ($billic->module_has_function($service['module'], 'service_info')) {
 				$vars = array();
 				$tmp = $db->q('SELECT * FROM `serviceoptions` WHERE `serviceid` = ?', $service['id']);
 				foreach ($tmp as $v) {
@@ -866,10 +831,7 @@ class Services {
 					'service' => $service,
 					'vars' => $vars,
 				);
-				$info = call_user_func(array(
-					$billic->modules[$service['module']],
-					'service_info'
-				) , $array);
+				$info = $billic->module_has_function($service['module'], 'service_info', $array);
 				echo $info;
 			} else {
 				echo $service['info_cache'];
@@ -957,10 +919,7 @@ class Services {
 			Generate Renewal Invoices
 		*/
 		$services = $db->q('SELECT * FROM `services` WHERE (`domainstatus` = \'Active\' OR `domainstatus` = \'Suspended\') AND `invoicegenerated` = \'0\' AND `nextduedate` < \'' . (time() + 604800) . '\''); // 1 week
-		$billic->module('BillingCycles');
-		if (count($services) > 0) {
-			$billingcycles = $billic->modules['BillingCycles']->list_billing_cycles();
-		}
+		if (count($services) > 0) $billingcycles = $billic->module('BillingCycles', 'list_billing_cycles');
 		foreach ($services as $service) {
 			if (!array_key_exists($service['billingcycle'], $billingcycles)) {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'invoice', 'Invalid Billing Cycle', $service['id']);
@@ -976,12 +935,11 @@ class Services {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'invoice', 'User who owns the service does not exist', $service['id']);
 				continue;
 			}
-			$billic->module('Invoices');
-			$billic->modules['Invoices']->generate(array(
+			$billic->module('Invoices', 'generate', [
 				'service' => $service,
 				'user' => $user_row,
 				'duedate' => $service['nextduedate'],
-			));
+			]);
 		}
 		$services = $db->q('SELECT * FROM `services` WHERE `domainstatus` = \'Pending\' AND `nextduedate` > ? AND `error` = ?', time() , '');
 		foreach ($services as $service) {
@@ -997,15 +955,14 @@ class Services {
 						$template_id = $db->q('SELECT `id` FROM `emailtemplates` WHERE `default` = ?', 'Service Activated');
 						$template_id = $template_id[0]['id'];
 					}
-					$billic->module('EmailTemplates');
-					$billic->modules['EmailTemplates']->send(array(
+					$billic->module('EmailTemplates', 'send', [
 						'to' => $user_row['email'],
 						'template_id' => $template_id,
 						'vars' => array(
 							'services' => $service,
 							'users' => $user_row,
 						) ,
-					));
+					]);
 				}
 			} else {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'create', 'Module Error: ' . $create, $service['id']);
@@ -1020,8 +977,7 @@ class Services {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'suspend', 'User who owns the service does not exist', $service['id']);
 				continue;
 			}
-			$billic->module($service['module']);
-			if (!method_exists($billic->modules[$service['module']], 'suspend')) {
+			if (!$billic->module_has_function($service['module'], 'suspend')) {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'suspend', 'There is no suspend function for the module "' . $service['module'] . '"', $service['id']);
 				continue;
 			}
@@ -1034,10 +990,7 @@ class Services {
 				'service' => $service,
 				'vars' => $vars,
 			);
-			$suspend = call_user_func(array(
-				$billic->modules[$service['module']],
-				'suspend'
-			) , $array);
+			$suspend = $billic->module($service['module'], 'suspend', $array);
 			if ($suspend !== true) {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'suspend', 'Module Error: ' . $suspend, $service['id']);
 			} else {
@@ -1048,15 +1001,14 @@ class Services {
 					$template_id = $db->q('SELECT `id` FROM `emailtemplates` WHERE `default` = ?', 'Service Suspended');
 					$template_id = $template_id[0]['id'];
 				}
-				$billic->module('EmailTemplates');
-				$billic->modules['EmailTemplates']->send(array(
+				$billic->module('EmailTemplates', 'send', [
 					'to' => $user_row['email'],
 					'template_id' => $template_id,
 					'vars' => array(
 						'services' => $service,
 						'users' => $user_row,
 					) ,
-				));
+				]);
 			}
 		}
 		// terminate suspended accounts 2 weeks after nextduedate & suspendeddate
@@ -1069,8 +1021,7 @@ class Services {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'terminate', 'User who owns the service does not exist', $service['id']);
 				continue;
 			}
-			$billic->module($service['module']);
-			if (!method_exists($billic->modules[$service['module']], 'terminate')) {
+			if (!$billic->module_has_function($service['module'], 'terminate')) {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'terminate', 'There is no terminate function for the module "' . $servicep['module'] . '"', $service['id']);
 				continue;
 			}
@@ -1083,10 +1034,7 @@ class Services {
 				'service' => $service,
 				'vars' => $vars,
 			);
-			$terminate = call_user_func(array(
-				$billic->modules[$service['module']],
-				'terminate'
-			) , $array);
+			$terminate = $billic->module($service['module'], 'terminate', $array);
 			if ($terminate !== true) {
 				$db->q('UPDATE `services` SET `errorfunc` = ?, `error` = ? WHERE `id` = ?', 'terminate', 'Module Error: ' . $terminate, $service['id']);
 			} else {
@@ -1097,15 +1045,14 @@ class Services {
 					$template_id = $db->q('SELECT `id` FROM `emailtemplates` WHERE `default` = ?', 'Service Terminated');
 					$template_id = $template_id[0]['id'];
 				}
-				$billic->module('EmailTemplates');
-				$billic->modules['EmailTemplates']->send(array(
+				$billic->module('EmailTemplates', 'send', [
 					'to' => $user_row['email'],
 					'template_id' => $template_id,
 					'vars' => array(
 						'services' => $service,
 						'users' => $user_row,
 					) ,
-				));
+				]);
 			}
 		}
 	}
@@ -1132,8 +1079,7 @@ class Services {
 		}
 		$user_row = $db->q('SELECT * FROM `users` WHERE `id` = ?', $service['userid']);
 		$user_row = $user_row[0];
-		$billic->module($orderform['module']);
-		if (!method_exists($billic->modules[$service['module']], 'create')) {
+		if (!$billic->module_has_function($service['module'], 'create')) {
 			return 'There is no create function for the module "' . $service['module'] . '"';
 		}
 		/*
@@ -1150,10 +1096,7 @@ class Services {
 			'plan' => $plan,
 			'user' => $user_row,
 		);
-		$create = call_user_func(array(
-			$billic->modules[$service['module']],
-			'create'
-		) , $array);
+		$create = $billic->module($service['module'], 'create', $array);
 		return $create;
 	}
 	function api() {
@@ -1204,7 +1147,6 @@ class Services {
 					return;
 				break;
 			}
-			$billic->module($service['module']);
 			$vars = array();
 			$tmp = $db->q('SELECT * FROM `serviceoptions` WHERE `serviceid` = ?', $service['id']);
 			foreach ($tmp as $v) {
@@ -1214,13 +1156,10 @@ class Services {
 				'service' => $service,
 				'vars' => $vars,
 			);
-			if (method_exists($billic->modules[$service['module']], 'user_cp')) {
+			if ($billic->module_has_function($service['module'], 'user_cp')) {
 				ob_start();
 				define('SHUTDOWN_API_RETURN_HTML', true);
-				call_user_func(array(
-					$billic->modules[$service['module']],
-					'user_cp'
-				) , $array);
+				$billic->module($service['module'], 'user_cp', $array);
 				return;
 			} else {
 				echo json_encode(array(
@@ -1239,18 +1178,17 @@ class Services {
 				));
 				return;
 			}
-			$billic->module('Invoices');
 			// Get unpaid invoice for the service
 			$invoiceid = $db->q('SELECT `invoiceid` FROM `invoiceitems` WHERE `relid` = ? ORDER BY `id` DESC LIMIT 1', $service['id']);
 			$invoiceid = $invoiceid[0]['invoiceid'];
 			$invoicecount = $db->q('SELECT COUNT(*) FROM `invoices` WHERE `id` = ? AND `status` = ?', $invoiceid, 'Unpaid');
 			if ($invoicecount[0]['COUNT(*)'] == 0) {
 				// Generate Invoice if not exists
-				$invoiceid = $billic->modules['Invoices']->generate(array(
+				$invoiceid = $billic->module('Invoices', 'generate', [
 					'service' => $service,
 					'user' => $billic->user,
 					'duedate' => $service['nextduedate'],
-				));
+				]);
 			}
 			$invoice = $db->q('SELECT * FROM `invoices` WHERE `id` = ?', $invoiceid);
 			$invoice = $invoice[0];
@@ -1268,13 +1206,13 @@ class Services {
 				return;
 			}
 			ob_start();
-			$error = $billic->modules['Invoices']->addpayment(array(
+			$error = $billic->module('Invoices', 'addpayment', [
 				'gateway' => 'credit',
 				'invoiceid' => $invoice['id'],
 				'amount' => $invoice['total'],
 				'currency' => get_config('billic_currency_code') ,
 				'transactionid' => 'credit',
-			));
+			]);
 			ob_end_clean();
 			if ($error !== true) {
 				echo json_encode(array(
@@ -1299,9 +1237,8 @@ class Services {
 			if (!empty($_POST['desc'])) {
 				$service['domain'] = $_POST['desc'];
 			}
-			$billic->module($service['module']);
 			$info = '';
-			if (method_exists($billic->modules[$service['module']], 'service_info')) {
+			if ($billic->module_has_function($service['module'], 'service_info')) {
 				$vars = array();
 				$tmp = $db->q('SELECT * FROM `serviceoptions` WHERE `serviceid` = ?', $service['id']);
 				foreach ($tmp as $v) {
@@ -1311,10 +1248,7 @@ class Services {
 					'service' => $service,
 					'vars' => $vars,
 				);
-				$info = call_user_func(array(
-					$billic->modules[$service['module']],
-					'service_info'
-				) , $array);
+				$info = $billic->module($service['module'], 'service_info', $array);
 			}
 			$db->q('UPDATE `services` SET `domain` = ?, `info_cache` = ?, `info_last_sync` = ? WHERE `id` = ?', $service['domain'], $info, time() , $service['id']);
 			echo json_encode(array(
